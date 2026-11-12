@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Outcomes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Treatment outcomes</h1><div class="muted">Benchmark: {{ (1 - m.expected_mortality)|pct(0) }} success · ≤ {{ m.expected_mortality|pct(0) }} mortality</div></div>
+</div>
+
+{% if m.mortality_alert %}
+<div class="flash flash-error" style="margin-bottom:1rem"><b>⚠ Mortality is above the expected {{ m.expected_mortality|pct(0) }}.</b>
+  Centre mortality is {{ m.mortality|pct }} ({{ m.deceased }} of {{ m.closed }} closed cases). Review treatment protocols and recent deaths.</div>
+{% endif %}
+{% if m.small_sample %}<div class="flash flash-info" style="margin-bottom:1rem">Only {{ m.closed }} closed cases so far – rates may swing a lot until at least {{ cfg.MIN_CASES_FOR_STATS }} cases close.</div>{% endif %}
+
+<div class="stats">
+  <div class="stat {{ 'alert' if m.mortality_alert else 'good' }}"><div class="label">Mortality rate</div><div class="value">{{ m.mortality|pct }}</div><div class="sub">target ≤ {{ m.expected_mortality|pct(0) }}</div></div>
+  <div class="stat {{ 'alert' if m.mortality_alert else 'good' }}"><div class="label">Success rate</div><div class="value">{{ m.recovery|pct }}</div><div class="sub">target ≥ {{ (1 - m.expected_mortality)|pct(0) }}</div></div>
+  <div class="stat"><div class="label">Closed cases</div><div class="value">{{ m.closed }}</div><div class="sub">{{ m.discharged }} recovered · {{ m.deceased }} deceased</div></div>
+  <div class="stat"><div class="label">Avg. length of stay</div><div class="value">{{ m.avg_stay if m.avg_stay is not none else '—' }}</div><div class="sub">days (recovered patients)</div></div>
+  <div class="stat {{ 'alert' if m.avg_discharge_delay and m.avg_discharge_delay > 0.5 }}"><div class="label">Avg. discharge delay</div><div class="value">{{ m.avg_discharge_delay if m.avg_discharge_delay is not none else '—' }}</div><div class="sub">days after cure · {{ m.delayed_discharges }} late discharges</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Cumulative mortality vs benchmark</h2>
+    <div class="chart-box"><canvas id="mortChart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Today's operations</h2>
+    <dl class="kv">
+      <dt>Occupancy</dt><dd>{{ m.occupancy }}/{{ m.total_rooms }}</dd>
+      <dt>Temperatures taken</dt><dd>{{ m.temps_done_pct }}%</dd>
+      <dt>Doctor visits done</dt><dd>{{ m.visits_done_pct }}%</dd>
+      <dt>Cured, awaiting discharge</dt><dd>{{ m.eligible_waiting }}</dd>
+    </dl>
+    <p><a href="{{ url_for('admin.history') }}">View all closed cases →</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+<script>
+  const t = {{ m.trend|tojson }};
+  const bench = {{ m.expected_mortality * 100 }};
+  new Chart(document.getElementById('mortChart'), {
+    type: 'line',
+    data: { labels: t.map(x => x.date.slice(5)),
+      datasets: [
+        { label: 'Mortality % (cumulative)', data: t.map(x => x.rate), borderColor: '#6b46c1', tension: .2, pointRadius: 2 },
+        { label: 'Expected ' + bench + '%', data: t.map(() => bench), borderColor: '#c0352b', borderDash: [6, 4], pointRadius: 0, borderWidth: 1 }
+      ] },
+    options: { maintainAspectRatio: false, scales: { y: { min: 0, suggestedMax: 30, ticks: { callback: v => v + '%' } } }, plugins: { legend: { position: 'bottom' } } }
+  });
+</script>
+{% endblock %}

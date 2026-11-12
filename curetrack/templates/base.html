@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CureTrack{% endblock %} · CureTrack</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌡️</text></svg>">
+</head>
+<body>
+{% if current_user %}
+<header class="topbar">
+  <a class="brand" href="{{ url_for('main.index') }}"><span class="logo">🌡️</span> CureTrack</a>
+  <nav class="nav">
+    {% if current_user.role == Role.NURSE %}
+      <a href="{{ url_for('nurse.worklist') }}" class="{{ 'active' if request.blueprint == 'nurse' }}">Temperature rounds</a>
+    {% endif %}
+    {% if current_user.is_doctor %}
+      <a href="{{ url_for('doctor.worklist') }}" class="{{ 'active' if request.blueprint == 'doctor' }}">Doctor rounds</a>
+    {% endif %}
+    {% if current_user.role == Role.HEAD_DOCTOR %}
+      <a href="{{ url_for('reports.outcomes') }}" class="{{ 'active' if request.blueprint == 'reports' }}">Outcomes</a>
+    {% endif %}
+    {% if current_user.role == Role.ADMIN %}
+      <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if request.endpoint == 'admin.dashboard' }}">Beds &amp; discharges</a>
+      <a href="{{ url_for('admin.admit') }}" class="{{ 'active' if request.endpoint == 'admin.admit' }}">Admit patient</a>
+    {% endif %}
+    {% if current_user.role in (Role.ADMIN, Role.HEAD_DOCTOR) %}
+      <a href="{{ url_for('admin.history') }}" class="{{ 'active' if request.endpoint == 'admin.history' }}">Closed cases</a>
+    {% endif %}
+    <a href="{{ url_for('main.patient_list') }}" class="{{ 'active' if request.endpoint in ('main.patient_list','main.patient_detail') }}">Patients</a>
+  </nav>
+  <div class="who">
+    <span class="role-pill role-{{ current_user.role }}">{{ current_user.role_label }}</span>
+    <span class="who-name">{{ current_user.name }}</span>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Log out</a>
+  </div>
+</header>
+{% if cfg.DEMO_MODE %}
+<div class="demobar">
+  <span>🧪 Demo mode · Today is <strong>{{ today.strftime('%a %d %b %Y') }}</strong></span>
+  <form method="post" action="{{ url_for('main.demo_advance_day') }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <button class="btn btn-sm btn-ghost" title="Simulate the next day so cure streaks and daily tasks can be demonstrated">Advance to next day →</button>
+  </form>
+  <form method="post" action="{{ url_for('main.demo_reset') }}" onsubmit="return confirm('Reset all demo data?')">
+    <button class="btn btn-sm btn-ghost">Reset demo data</button>
+  </form>
+</div>
+{% endif %}
+{% endif %}
+
+<main class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flashes">
+        {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

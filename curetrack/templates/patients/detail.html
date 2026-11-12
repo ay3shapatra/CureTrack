@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a href="{{ url_for('main.patient_list') }}">← Patients</a>
+    <h1>{{ p.name }} {% if p.is_active %}<small>· Room {{ p.room_number }}</small>{% endif %}</h1>
+    <div class="muted">{{ p.code }} · {{ p.age }} y · {{ p.sex }} · admitted {{ p.admitted_on.strftime('%d %b %Y') }}</div>
+  </div>
+  <div>
+    {% if p.is_active %}{{ m.stage_pill(s) }}
+    {% elif p.status == 'discharged' %}<span class="pill pill-done">Discharged {{ p.closed_on.strftime('%d %b %Y') }}</span>
+    {% else %}<span class="pill pill-muted">Deceased {{ p.closed_on.strftime('%d %b %Y') }}</span>{% endif %}
+  </div>
+</div>
+
+{% if p.is_active %}
+<div class="stats">
+  <div class="stat"><div class="label">Today's temperature</div><div class="value">{{ m.temp_badge(s.reading_today.temperature_c if s.reading_today else none) }}</div><div class="sub">{{ 'by ' ~ s.reading_today.recorded_by.name if s.reading_today else 'not measured yet' }}</div></div>
+  <div class="stat"><div class="label">Doctor visit today</div><div class="value" style="font-size:1.2rem">{{ '✅ Done' if s.visit_today else '⏳ Pending' }}</div><div class="sub">{{ s.visit_today.doctor.name if s.visit_today else ('needs temperature first' if not s.reading_today else 'ready') }}</div></div>
+  <div class="stat {{ 'good' if s.eligible }}"><div class="label">Fever-free streak</div><div class="value">{{ m.streak(s.streak, s.cure_days) }}</div><div class="sub">{{ 'Cured – in discharge queue' if s.eligible else (s.cure_days - s.streak) ~ ' more fever-free day(s) needed' }}</div></div>
+  <div class="stat"><div class="label">Day in care</div><div class="value">{{ s.day_in_care }}</div></div>
+</div>
+
+{# ---- role-specific actions ---- #}
+{% if current_user.role == Role.NURSE %}
+<div class="card"><h2>{{ 'Correct today\'s reading' if s.reading_today else 'Record today\'s temperature' }}</h2>
+  {{ m.temp_form(p, request.path, correction=s.reading_today is not none) }}</div>
+{% endif %}
+{% if current_user.is_doctor %}
+<div class="card" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+  {% if s.reading_today %}<a class="btn btn-primary" href="{{ url_for('doctor.visit', patient_id=p.id) }}">{{ 'Edit today\'s visit' if s.visit_today else 'Start visit' }}</a>
+  {% else %}<button class="btn" disabled>Start visit</button><span class="muted">Waiting for today's temperature from the nursing team.</span>{% endif %}
+</div>
+{% endif %}
+{% if current_user.role == Role.ADMIN and s.eligible %}
+<div class="card"><form method="post" action="{{ url_for('admin.discharge', patient_id=p.id) }}" onsubmit="return confirm('Discharge {{ p.name }}?')">
+  <button class="btn btn-purple">Discharge patient</button> <span class="muted">Met the {{ cfg.CURE_DAYS }}-day fever-free criterion.</span></form></div>
+{% endif %}
+{% else %}
+<div class="card"><dl class="kv"><dt>Outcome</dt><dd>{{ 'Recovered & discharged' if p.status == 'discharged' else 'Deceased' }}</dd>
+  <dt>Closed on</dt><dd>{{ p.closed_on.strftime('%d %b %Y') }} by {{ p.closed_by.name if p.closed_by else '—' }}</dd>
+  <dt>Length of stay</dt><dd>{{ (p.closed_on - p.admitted_on).days }} days</dd>
+  {% if show_notes and p.closing_note %}<dt>Note</dt><dd>{{ p.closing_note }}</dd>{% endif %}</dl></div>
+{% endif %}
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Temperature trend</h2>
+    {% if chart %}<div class="chart-box"><canvas id="tempChart"></canvas></div>{% else %}<div class="empty">No readings yet.</div>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Daily log</h2>
+    <div class="table-wrap" style="max-height:300px;overflow-y:auto"><table>
+      <thead><tr><th>Date</th><th>Temp</th><th>Nurse</th><th>Doctor visit</th></tr></thead>
+      <tbody>
+      {% set visits = {} %}{% for v in p.visits %}{% set _ = visits.update({v.visit_date: v}) %}{% endfor %}
+      {% for r in p.readings|reverse %}
+        <tr><td>{{ r.reading_date.strftime('%d %b') }}</td><td>{{ m.temp_badge(r.temperature_c) }}{% if r.corrected_at %} <small title="{{ r.correction_reason }}">✎</small>{% endif %}</td>
+          <td><small>{{ r.recorded_by.name }}</small></td>
+          <td><small>{{ visits[r.reading_date].doctor.name if r.reading_date in visits else '—' }}</small></td></tr>
+      {% else %}<tr><td colspan="4" class="empty">No readings yet.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+{% if show_notes %}
+<div class="card">
+  <h2>Visit notes &amp; treatment <small>(doctors only)</small></h2>
+  {% for v in p.visits|reverse %}
+    <div style="border-bottom:1px solid var(--line);padding:.5rem 0"><b>{{ v.visit_date.strftime('%d %b %Y') }}</b> · {{ v.doctor.name }}<br>{{ v.notes }}{% if v.treatment %}<br><small>Rx: {{ v.treatment }}</small>{% endif %}</div>
+  {% else %}<div class="empty">No visits yet.</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if current_user.is_doctor and p.is_active %}
+<div class="card danger-zone">
+  <details><summary style="color:var(--danger)">Record patient death</summary>
+    <form method="post" action="{{ url_for('doctor.record_death', patient_id=p.id) }}" style="margin-top:.75rem">
+      <div class="field"><label>Cause / note *</label><input name="note" required></div>
+      <div class="field"><label>Type the patient's full name to confirm: <code>{{ p.name }}</code></label><input name="confirm_name" required autocomplete="off"></div>
+      <button class="btn btn-danger">Record death &amp; close case</button>
+    </form>
+  </details>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if chart %}
+<script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+<script>
+  const pts = {{ chart|tojson }};
+  const threshold = {{ cfg.FEVER_THRESHOLD_C }};
+  new Chart(document.getElementById('tempChart'), {
+    type: 'line',
+    data: { labels: pts.map(p => p.date.slice(5)),
+      datasets: [
+        { label: 'Temperature °C', data: pts.map(p => p.temp), borderColor: '#0d7c86', tension: 0,
+          pointBackgroundColor: pts.map(p => p.temp >= threshold ? '#c0352b' : '#1f8a4c'), pointRadius: 4 },
+        { label: 'Fever threshold', data: pts.map(() => threshold), borderColor: '#c0352b', borderDash: [6, 4], pointRadius: 0, borderWidth: 1 }
+      ] },
+    options: { maintainAspectRatio: false, scales: { y: { suggestedMin: 36, suggestedMax: 41 } }, plugins: { legend: { position: 'bottom' } } }
+  });
+</script>
+{% endif %}
+{% endblock %}

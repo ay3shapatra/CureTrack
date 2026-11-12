@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Doctor rounds{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Doctor rounds</h1>
+    <div class="muted">{{ today.strftime('%A, %d %B %Y') }} · visit patients once today's temperature is in</div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="label">Ready for visit</div><div class="value">{{ ready|length }}</div><div class="sub">temperature taken today</div></div>
+  <div class="stat"><div class="label">Waiting for nurse</div><div class="value">{{ waiting|length }}</div><div class="sub">no temperature yet – don't visit</div></div>
+  <div class="stat {{ 'good' if done|length == total }}"><div class="label">Visited today</div><div class="value">{{ done|length }}</div><div class="sub">of {{ total }} admitted</div></div>
+  <div class="stat"><div class="label">Cured</div><div class="value">{{ cured|length }}</div><div class="sub">sent to admin for discharge automatically</div></div>
+</div>
+
+<div class="card">
+  <h2>Ready for visit <span class="count">{{ ready|length }}</span> <small>· sorted by urgency</small></h2>
+  {% if not ready %}<div class="empty">No patients waiting for a visit right now.</div>{% else %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Room</th><th>Patient</th><th>Today's temp</th><th>Streak</th><th>Day</th><th></th></tr></thead>
+    <tbody>
+    {% for s in ready %}{% set p = s.patient %}
+      <tr class="{{ 'row-urgent' if s.high_fever }}">
+        <td class="room">{{ p.room_number }}</td>
+        <td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a> <small>{{ p.age }}{{ p.sex[0] }}</small>
+          {% if s.high_fever %}<span class="pill pill-danger">Urgent</span>{% endif %}
+          {% if s.eligible %}<span class="pill pill-cured">Cured</span>{% endif %}</td>
+        <td>{{ m.temp_badge(s.reading_today.temperature_c) }}</td>
+        <td>{{ m.streak(s.streak, s.cure_days) }}</td>
+        <td>{{ s.day_in_care }}</td>
+        <td><a class="btn btn-sm btn-primary" href="{{ url_for('doctor.visit', patient_id=p.id) }}">Start visit</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Waiting for temperature <span class="count">{{ waiting|length }}</span></h2>
+    <p class="muted" style="margin-top:-.5rem;font-size:.88rem">These patients are on the nurses' list. They move to "Ready" automatically.</p>
+    {% if not waiting %}<div class="empty">None 🎉</div>{% else %}
+    <table><tbody>
+      {% for s in waiting %}<tr><td class="room">{{ s.patient.room_number }}</td><td><a href="{{ url_for('main.patient_detail', patient_id=s.patient.id) }}">{{ s.patient.name }}</a></td><td><span class="pill pill-todo">Needs temperature</span></td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Visited today <span class="count">{{ done|length }}</span></h2>
+    {% if not done %}<div class="empty">No visits completed yet.</div>{% else %}
+    <table><tbody>
+      {% for s in done %}<tr><td class="room">{{ s.patient.room_number }}</td><td><a href="{{ url_for('main.patient_detail', patient_id=s.patient.id) }}">{{ s.patient.name }}</a></td><td><small>{{ s.visit_today.doctor.name }}</small></td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

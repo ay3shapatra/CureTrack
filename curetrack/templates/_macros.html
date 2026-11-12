@@ -1,0 +1,38 @@
+{% macro temp_badge(t) -%}
+  {%- if t is none -%}<span class="badge badge-muted">—</span>
+  {%- elif t >= cfg.HIGH_FEVER_C -%}<span class="badge badge-danger" title="High fever">▲ {{ t }} °C</span>
+  {%- elif t >= cfg.FEVER_THRESHOLD_C -%}<span class="badge badge-warn" title="Fever">{{ t }} °C</span>
+  {%- else -%}<span class="badge badge-ok" title="No fever">{{ t }} °C</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro streak(n, total) -%}
+  <span class="streak" title="{{ n }} of {{ total }} consecutive fever-free days">
+    {%- for i in range(total) %}<i class="{{ 'on' if i < n }}"></i>{% endfor -%}
+    <small>{{ n if n < total else total }}/{{ total }}</small>
+  </span>
+{%- endmacro %}
+
+{% macro stage_pill(s) -%}
+  {%- if s.eligible -%}<span class="pill pill-cured">Cured · awaiting discharge</span>
+  {%- elif s.stage == 'needs_temp' -%}<span class="pill pill-todo">Needs temperature</span>
+  {%- elif s.stage == 'ready_for_doctor' -%}<span class="pill pill-ready">Ready for doctor</span>
+  {%- else -%}<span class="pill pill-done">Rounds complete</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro temp_form(p, next_url, correction=False) -%}
+<form method="post" action="{{ url_for('nurse.record_temperature', patient_id=p.id) }}" class="temp-form">
+  <input type="hidden" name="next" value="{{ next_url }}">
+  {% if correction %}<input type="hidden" name="correction" value="1">{% endif %}
+  <input type="number" name="temperature" step="0.1" min="30" max="115" required
+         placeholder="{{ 'New value' if correction else 'e.g. 37.4' }}" aria-label="Temperature for {{ p.name }}">
+  <select name="unit" aria-label="Unit"><option value="C">°C</option><option value="F">°F</option></select>
+  {% if correction %}
+    <input type="text" name="reason" required minlength="3" placeholder="Reason for correction" class="reason">
+    <button class="btn btn-sm btn-ghost">Save correction</button>
+  {% else %}
+    <button class="btn btn-sm btn-primary">Record</button>
+  {% endif %}
+</form>
+{%- endmacro %}

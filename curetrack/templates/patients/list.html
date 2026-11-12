@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Patients{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Patients</h1><div class="muted">{{ rows|length }} shown</div></div>
+  <form method="get" style="display:flex;gap:.4rem">
+    <input name="q" value="{{ q }}" placeholder="Name, room or ID">
+    <select name="show"><option value="active" {{ 'selected' if show == 'active' }}>Admitted</option><option value="all" {{ 'selected' if show == 'all' }}>All incl. closed</option></select>
+    <button class="btn btn-primary">Search</button>
+  </form>
+</div>
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>Room</th><th>Patient</th><th>Admitted</th><th>Last reading</th><th>Streak</th><th>Today</th></tr></thead>
+    <tbody>
+    {% for s in rows %}{% set p = s.patient %}
+      <tr>
+        <td class="room">{{ p.room_number if p.is_active else '—' }}</td>
+        <td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a> <small>{{ p.code }}</small></td>
+        <td>{{ p.admitted_on.strftime('%d %b') }}</td>
+        <td>{{ m.temp_badge(s.last_reading.temperature_c if s.last_reading else none) }}</td>
+        <td>{% if p.is_active %}{{ m.streak(s.streak, s.cure_days) }}{% endif %}</td>
+        <td>{% if p.is_active %}{{ m.stage_pill(s) }}{% elif p.status == 'discharged' %}<span class="pill pill-done">Discharged</span>{% else %}<span class="pill pill-muted">Deceased</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="empty">No patients match.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

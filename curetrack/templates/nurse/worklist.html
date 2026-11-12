@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Temperature rounds{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Temperature rounds</h1>
+    <div class="muted">{{ today.strftime('%A, %d %B %Y') }} · one reading per patient per day</div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat {{ 'good' if not pending }}"><div class="label">Still to measure</div><div class="value">{{ pending|length }}</div><div class="sub">of {{ total }} admitted patients</div></div>
+  <div class="stat"><div class="label">Measured today</div><div class="value">{{ done|length }}</div><div class="sub">{{ (100 * done|length / (total or 1))|round|int }}% complete</div></div>
+  <div class="stat"><div class="label">Fevers today</div><div class="value">{{ done|selectattr('fever_today')|list|length }}</div><div class="sub">≥ {{ cfg.FEVER_THRESHOLD_C }} °C</div></div>
+</div>
+
+<div class="card">
+  <div class="tabs">
+    <a href="?tab=pending" class="{{ 'active' if tab == 'pending' }}">To measure <span class="count">{{ pending|length }}</span></a>
+    <a href="?tab=done" class="{{ 'active' if tab == 'done' }}">Done today <span class="count">{{ done|length }}</span></a>
+  </div>
+
+  {% if tab == 'pending' %}
+    {% if not pending %}<div class="empty">✅ All patients have had their temperature measured today.</div>{% else %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Room</th><th>Patient</th><th>Last reading</th><th>Fever-free streak</th><th>Record today's temperature</th></tr></thead>
+      <tbody>
+      {% for s in pending %}{% set p = s.patient %}
+        <tr id="p{{ p.id }}">
+          <td class="room">{{ p.room_number }}</td>
+          <td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a><br>
+            <small>{{ p.age }}{{ p.sex[0] }} · day {{ s.day_in_care }}{% if s.missed_yesterday %} · <span style="color:var(--danger)">missed yesterday</span>{% endif %}</small></td>
+          <td>{% if s.last_reading %}{{ m.temp_badge(s.last_reading.temperature_c) }} <small>{{ s.last_reading.reading_date.strftime('%d %b') }}</small>{% else %}<small>New admission</small>{% endif %}</td>
+          <td>{{ m.streak(s.streak, s.cure_days) }}</td>
+          <td>{{ m.temp_form(p, url_for('nurse.worklist', tab='pending')) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% endif %}
+  {% else %}
+    {% if not done %}<div class="empty">No temperatures recorded yet today.</div>{% else %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Room</th><th>Patient</th><th>Today</th><th>Recorded by</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for s in done %}{% set p = s.patient %}{% set r = s.reading_today %}
+        <tr>
+          <td class="room">{{ p.room_number }}</td>
+          <td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a></td>
+          <td>{{ m.temp_badge(r.temperature_c) }} <small>{{ c_to_f(r.temperature_c) }} °F</small>{% if r.corrected_at %} <small title="{{ r.correction_reason }}">(corrected)</small>{% endif %}</td>
+          <td><small>{{ r.recorded_by.name }}<br>{{ r.recorded_at.strftime('%H:%M') }} UTC</small></td>
+          <td>{{ m.stage_pill(s) }}</td>
+          <td><details><summary>Correct</summary>{{ m.temp_form(p, url_for('nurse.worklist', tab='done'), correction=True) }}</details></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

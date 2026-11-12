@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Beds & discharges{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Beds &amp; discharges</h1><div class="muted">{{ today.strftime('%A, %d %B %Y') }}</div></div>
+  {% if free %}<a class="btn btn-primary" href="{{ url_for('admin.admit') }}">+ Admit patient</a>
+  {% else %}<button class="btn" disabled title="Facility at full capacity">+ Admit patient (full)</button>{% endif %}
+</div>
+
+<div class="stats">
+  <div class="stat {{ 'alert' if not free }}"><div class="label">Occupancy</div><div class="value">{{ occupied }}/{{ cfg.TOTAL_ROOMS }}</div><div class="sub">{{ free }} room{{ '' if free == 1 else 's' }} free</div></div>
+  <div class="stat {{ 'alert' if queue }}"><div class="label">Ready to discharge</div><div class="value">{{ queue|length }}</div><div class="sub">met {{ cfg.CURE_DAYS }}-day fever-free rule</div></div>
+</div>
+
+<div class="card">
+  <h2>Discharge queue <span class="count">{{ queue|length }}</span></h2>
+  <p class="muted" style="margin-top:-.5rem;font-size:.88rem">Patients appear here automatically the moment their {{ cfg.CURE_DAYS }}rd consecutive fever-free reading is recorded. Discharge them today to free the bed.</p>
+  {% if not queue %}<div class="empty">No patients are ready for discharge.</div>{% else %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Room</th><th>Patient</th><th>Admitted</th><th>Streak</th><th>Last reading</th><th></th></tr></thead>
+    <tbody>
+    {% for s in queue %}{% set p = s.patient %}
+      <tr>
+        <td class="room">{{ p.room_number }}</td>
+        <td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a> <small>{{ p.code }}</small></td>
+        <td>{{ p.admitted_on.strftime('%d %b') }} <small>(day {{ s.day_in_care }})</small></td>
+        <td>{{ m.streak(s.streak, s.cure_days) }}</td>
+        <td>{{ m.temp_badge(s.last_reading.temperature_c) }} <small>{{ s.last_reading.reading_date.strftime('%d %b') }}</small></td>
+        <td><form method="post" action="{{ url_for('admin.discharge', patient_id=p.id) }}" onsubmit="return confirm('Discharge {{ p.name }} from Room {{ p.room_number }}?')">
+          <button class="btn btn-sm btn-purple">Discharge</button></form></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Rooms</h2>
+  <div class="rooms">
+    {% for n in range(1, cfg.TOTAL_ROOMS + 1) %}
+      {% set s = by_room.get(n) %}
+      {% if s %}
+        <a class="room-tile {{ 'cured' if s.eligible else ('todo' if s.stage == 'needs_temp') }}" href="{{ url_for('main.patient_detail', patient_id=s.patient.id) }}" title="{{ s.patient.name }}">
+          <b>{{ n }}</b><span>{{ s.patient.name.split(' ')[0] }}</span><span>{{ 'Cured' if s.eligible else 'Day ' ~ s.day_in_care }}</span></a>
+      {% else %}
+        <a class="room-tile free" href="{{ url_for('admin.admit', room=n) }}" title="Admit to room {{ n }}"><b>{{ n }}</b><span>Free</span><span>+ Admit</span></a>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="legend"><span><i style="background:#fff"></i>Occupied</span><span><i style="background:var(--warn-soft)"></i>Temperature pending today</span><span><i style="background:var(--purple-soft)"></i>Cured – discharge</span><span><i style="background:#eef6f6;border-style:dashed"></i>Free</span></div>
+</div>
+
+<div class="card">
+  <h2>Recently closed</h2>
+  <table><tbody>
+    {% for p in recent %}<tr><td class="room">{{ p.room_number }}</td><td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a></td>
+      <td>{% if p.status == 'discharged' %}<span class="pill pill-done">Discharged</span>{% else %}<span class="pill pill-muted">Deceased</span>{% endif %}</td><td><small>{{ p.closed_on.strftime('%d %b %Y') }}</small></td></tr>{% endfor %}
+  </tbody></table>
+  <p><a href="{{ url_for('admin.history') }}">All closed cases →</a></p>
+</div>
+{% endblock %}

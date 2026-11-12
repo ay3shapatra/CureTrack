@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Admit patient{% endblock %}
+{% block content %}
+<div class="page-head"><div><a href="{{ url_for('admin.dashboard') }}">← Beds &amp; discharges</a><h1>Admit patient</h1></div></div>
+
+{% if not rooms %}
+<div class="card danger-zone">
+  <h2>Facility at full capacity ({{ cfg.TOTAL_ROOMS }}/{{ cfg.TOTAL_ROOMS }})</h2>
+  <p>No rooms are free. Check the <a href="{{ url_for('admin.dashboard') }}">discharge queue</a> – discharging a cured patient frees their room immediately.</p>
+</div>
+{% else %}
+<div class="card" style="max-width:640px">
+  <form method="post">
+    <div class="field"><label for="name">Full name *</label><input id="name" name="name" required minlength="2" value="{{ form.get('name', '') }}"></div>
+    <div class="form-row">
+      <div class="field"><label for="age">Age *</label><input id="age" name="age" type="number" min="0" max="120" required value="{{ form.get('age', '') }}"></div>
+      <div class="field"><label for="sex">Sex *</label>
+        <select id="sex" name="sex" required><option value="">Select…</option>
+          {% for s in ['Female', 'Male', 'Other'] %}<option {{ 'selected' if form.get('sex') == s }}>{{ s }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="room">Room * <small>({{ rooms|length }} free)</small></label>
+        <select id="room" name="room" required>
+          {% for r in rooms %}<option value="{{ r }}" {{ 'selected' if (form.get('room')|string == r|string) or preselect == r }}>Room {{ r }}</option>{% endfor %}</select></div>
+    </div>
+    <p class="muted" style="font-size:.88rem">Admission date is set to today ({{ today.strftime('%d %b %Y') }}). The patient immediately appears on the nurses' temperature list.</p>
+    <button class="btn btn-primary">Admit patient</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

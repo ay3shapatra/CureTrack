@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Closed cases{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Closed cases</h1><div class="muted">{{ closed|length }} patients discharged or deceased</div></div></div>
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>ID</th><th>Patient</th><th>Room</th><th>Admitted</th><th>Closed</th><th>Stay</th><th>Outcome</th><th>Closed by</th></tr></thead>
+    <tbody>
+    {% for p in closed %}
+      <tr>
+        <td><small>{{ p.code }}</small></td>
+        <td><a href="{{ url_for('main.patient_detail', patient_id=p.id) }}">{{ p.name }}</a></td>
+        <td>{{ p.room_number }}</td>
+        <td>{{ p.admitted_on.strftime('%d %b %Y') }}</td>
+        <td>{{ p.closed_on.strftime('%d %b %Y') }}</td>
+        <td>{{ (p.closed_on - p.admitted_on).days }} d</td>
+        <td>{% if p.status == 'discharged' %}<span class="pill pill-done">Recovered</span>{% else %}<span class="pill pill-muted">Deceased</span>{% endif %}</td>
+        <td><small>{{ p.closed_by.name if p.closed_by else '—' }}</small></td>
+      </tr>
+    {% else %}<tr><td colspan="8" class="empty">No closed cases yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="login-hero">
+    <h1>🌡️ CureTrack</h1>
+    <p class="muted">Daily temperature rounds, doctor visits and timely discharges for the quarantine &amp; treatment centre.</p>
+    <div class="card">
+      <form method="post">
+        <div class="field"><label for="username">Username</label><input id="username" name="username" required autofocus></div>
+        <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center">Log in</button>
+      </form>
+    </div>
+  </div>
+  <div>
+    <h2>Demo accounts <small>(password: demo123)</small></h2>
+    <div class="demo-accounts">
+      {% for u in demo_users %}
+      <form method="post">
+        <input type="hidden" name="username" value="{{ u.username }}">
+        <input type="hidden" name="password" value="demo123">
+        <button class="btn"><span>{{ u.name }}</span><span class="role-pill role-{{ u.role }}" style="color:#fff">{{ u.role_label }}</span></button>
+      </form>
+      {% endfor %}
+    </div>
+    <p class="muted" style="font-size:.88rem">Suggested walkthrough: <b>Nurse</b> records temperatures → <b>Doctor</b> visits patients who are ready → <b>Admin</b> discharges cured patients and admits new ones → <b>Head Doctor</b> reviews outcomes.</p>
+  </div>
+</div>
+{% endblock %}
