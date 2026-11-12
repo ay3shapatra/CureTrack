@@ -9,8 +9,11 @@ def _database_url():
     url = os.environ.get("DATABASE_URL")
     if url:
         # Some providers hand out postgres://, SQLAlchemy wants postgresql://
+        # and SQLAlchemy 2.1 defaults to psycopg v3, so name the psycopg2 driver explicitly.
         if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql://", 1)
+            url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
         return url
     if os.environ.get("VERCEL"):
         # Vercel's filesystem is read-only except /tmp (data resets on cold start).
